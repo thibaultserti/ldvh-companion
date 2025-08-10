@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Fiche d'Aventure - LDVH Companion{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="medieval-font text-4xl text-amber-800">
+        <i class="fas fa-scroll mr-4"></i>
+        Fiche d'Aventure - Mode Jeu
+    </h1>
+    <div class="flex items-center space-x-4">
+        <a href="/adventure-sheets" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Retour aux fiches
+        </a>
+        <button onclick="saveSheet()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+            <i class="fas fa-save mr-2"></i>
+            Sauvegarder
+        </button>
+    </div>
+</div>
+
+<!-- Informations du livre -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Série</label>
+            <div class="text-lg font-semibold text-gray-800" id="series-name">{{ series_name }}</div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Livre</label>
+            <div class="text-lg font-semibold text-gray-800" id="book-title">{{ book_title }}</div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Tentative</label>
+            <div class="text-lg font-semibold text-gray-800" id="attempt-number">{{ attempt_number }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques du personnage -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Statistiques du Personnage</h2>
+
+    <!-- Statistiques initiales (non modifiables) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Habileté Initiale</label>
+            <div class="text-3xl font-bold text-amber-600" id="initial-skill">{{ initial_skill }}</div>
+            <p class="text-xs text-gray-500 mt-1">Valeur de départ</p>
+        </div>
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Endurance Initiale</label>
+            <div class="text-3xl font-bold text-red-600" id="initial-stamina">{{ initial_stamina }}</div>
+            <p class="text-xs text-gray-500 mt-1">Valeur de départ</p>
+        </div>
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Chance Initiale</label>
+            <div class="text-3xl font-bold text-green-600" id="initial-luck">{{ initial_luck }}</div>
+            <p class="text-xs text-gray-500 mt-1">Valeur de départ</p>
+        </div>
+    </div>
+
+    <!-- Statistiques courantes (modifiables) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="text-center p-4 bg-amber-50 rounded-lg">
+            <label for="current-skill" class="block text-sm font-medium text-gray-700 mb-2">Habileté Courante</label>
+            <input type="number" id="current-skill" value="{{ current_skill }}" min="0" max="12"
+                   class="text-3xl font-bold text-amber-600 text-center bg-transparent border-none w-full">
+            <p class="text-xs text-gray-500 mt-1">Modifiable pendant le jeu</p>
+        </div>
+        <div class="text-center p-4 bg-red-50 rounded-lg">
+            <label for="current-stamina" class="block text-sm font-medium text-gray-700 mb-2">Endurance Courante</label>
+            <input type="number" id="current-stamina" value="{{ current_stamina }}" min="0" max="24"
+                   class="text-3xl font-bold text-red-600 text-center bg-transparent border-none w-full">
+            <p class="text-xs text-gray-500 mt-1">Modifiable pendant le jeu</p>
+        </div>
+        <div class="text-center p-4 bg-green-50 rounded-lg">
+            <label for="current-luck" class="block text-sm font-medium text-gray-700 mb-2">Chance Courante</label>
+            <input type="number" id="current-luck" value="{{ current_luck }}" min="0" max="12"
+                   class="text-3xl font-bold text-green-600 text-center bg-transparent border-none w-full">
+            <p class="text-xs text-gray-500 mt-1">Modifiable pendant le jeu</p>
+        </div>
+    </div>
+</div>
+
+<!-- Inventaire -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Inventaire</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <label for="gold" class="block text-sm font-medium text-gray-700 mb-2">Or</label>
+            <input type="number" id="gold" value="{{ gold }}" min="0"
+                   class="w-full border border-gray-300 rounded-md px-3 py-2">
+        </div>
+        <div>
+            <label for="jewelry" class="block text-sm font-medium text-gray-700 mb-2">Bijoux</label>
+            <input type="text" id="jewelry" value="{{ jewelry or '' }}"
+                   class="w-full border border-gray-300 rounded-md px-3 py-2">
+        </div>
+        <div>
+            <label for="potions" class="block text-sm font-medium text-gray-700 mb-2">Potions</label>
+            <input type="text" id="potions" value="{{ potions or '' }}"
+                   class="w-full border border-gray-300 rounded-md px-3 py-2">
+        </div>
+        <div>
+            <label for="provisions" class="block text-sm font-medium text-gray-700 mb-2">Provisions</label>
+            <input type="text" id="provisions" value="{{ provisions or '' }}"
+                   class="w-full border border-gray-300 rounded-md px-3 py-2">
+        </div>
+    </div>
+
+    <div class="mt-6">
+        <label for="equipment" class="block text-sm font-medium text-gray-700 mb-2">Équipement transporté</label>
+        <textarea id="equipment" rows="3"
+                  class="w-full border border-gray-300 rounded-md px-3 py-2">{{ equipment or '' }}</textarea>
+    </div>
+</div>
+
+<!-- Rencontres de monstres -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Rencontres de Monstres</h2>
+
+    <div id="monster-encounters-container">
+        <!-- Les rencontres seront chargées dynamiquement -->
+    </div>
+
+    <button onclick="addMonsterEncounter()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">
+        <i class="fas fa-plus mr-2"></i>
+        Ajouter une rencontre
+    </button>
+</div>
+
+<!-- Notes -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Notes</h2>
+    <textarea id="notes" rows="4"
+              class="w-full border border-gray-300 rounded-md px-3 py-2">{{ notes or '' }}</textarea>
+</div>
+
+<!-- Statut -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Statut</h2>
+    <select id="is-active" class="w-full border border-gray-300 rounded-md px-3 py-2">
+        <option value="true" {% if is_active %}selected{% endif %}>Active</option>
+        <option value="false" {% if not is_active %}selected{% endif %}>Terminée</option>
+    </select>
+</div>
+
+<!-- Template pour une rencontre de monstre -->
+<template id="monster-encounter-template">
+    <div class="monster-encounter border border-gray-300 rounded-lg p-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nom du monstre</label>
+                <input type="text" class="monster-name w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Nom du monstre">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Paragraphe</label>
+                <input type="number" class="monster-paragraph w-full border border-gray-300 rounded-md px-3 py-2" placeholder="N° paragraphe">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Habileté</label>
+                <input type="number" class="monster-skill w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Habileté">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Endurance</label>
+                <input type="number" class="monster-stamina w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Endurance">
+            </div>
+        </div>
+        <button onclick="removeMonsterEncounter(this)" class="mt-2 text-red-600 hover:text-red-700">
+            <i class="fas fa-trash mr-1"></i>Supprimer
+        </button>
+    </div>
+</template>
+
+<!-- Données de la feuille -->
+<script>
+const sheetData = {
+    id: {{ id }},
+    book_id: {{ book_id }},
+    attempt_number: {{ attempt_number }},
+    character_name: "{{ character_name or '' }}",
+    initial_skill: {{ initial_skill }},
+    initial_stamina: {{ initial_stamina }},
+    initial_luck: {{ initial_luck }},
+    current_skill: {{ current_skill }},
+    current_stamina: {{ current_stamina }},
+    current_luck: {{ current_luck }},
+    gold: {{ gold }},
+    jewelry: "{{ jewelry or '' }}",
+    potions: "{{ potions or '' }}",
+    provisions: "{{ provisions or '' }}",
+    equipment: "{{ equipment or '' }}",
+    monster_encounters: {{ monster_encounters or '[]' }},
+    is_active: {{ 'true' if is_active else 'false' }},
+    notes: "{{ notes or '' }}"
+};
+
+// Charger les rencontres de monstres au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadMonsterEncounters();
+});
+
+function loadMonsterEncounters() {
+    const container = document.getElementById('monster-encounters-container');
+    container.innerHTML = '';
+
+    if (sheetData.monster_encounters && sheetData.monster_encounters.length > 0) {
+        sheetData.monster_encounters.forEach(encounter => {
+            addMonsterEncounter(encounter);
+        });
+    }
+}
+
+function addMonsterEncounter(encounterData = null) {
+    const container = document.getElementById('monster-encounters-container');
+    const template = document.getElementById('monster-encounter-template');
+    const clone = template.content.cloneNode(true);
+
+    if (encounterData) {
+        clone.querySelector('.monster-name').value = encounterData.name || '';
+        clone.querySelector('.monster-paragraph').value = encounterData.paragraph || '';
+        clone.querySelector('.monster-skill').value = encounterData.skill || '';
+        clone.querySelector('.monster-stamina').value = encounterData.stamina || '';
+    }
+
+    container.appendChild(clone);
+}
+
+function removeMonsterEncounter(button) {
+    button.closest('.monster-encounter').remove();
+}
+
+function getMonsterEncounters() {
+    const encounters = [];
+    const encounterElements = document.querySelectorAll('.monster-encounter');
+
+    encounterElements.forEach(element => {
+        const name = element.querySelector('.monster-name').value.trim();
+        const paragraph = element.querySelector('.monster-paragraph').value.trim();
+        const skill = element.querySelector('.monster-skill').value.trim();
+        const stamina = element.querySelector('.monster-stamina').value.trim();
+
+        if (name || paragraph || skill || stamina) {
+            encounters.push({
+                name: name,
+                paragraph: paragraph,
+                skill: skill,
+                stamina: stamina
+            });
+        }
+    });
+
+    return encounters;
+}
+
+async function saveSheet() {
+    const formData = {
+        character_name: sheetData.character_name,
+        current_skill: parseInt(document.getElementById('current-skill').value),
+        current_stamina: parseInt(document.getElementById('current-stamina').value),
+        current_luck: parseInt(document.getElementById('current-luck').value),
+        gold: parseInt(document.getElementById('gold').value) || 0,
+        jewelry: document.getElementById('jewelry').value || null,
+        potions: document.getElementById('potions').value || null,
+        provisions: document.getElementById('provisions').value || null,
+        equipment: document.getElementById('equipment').value || null,
+        monster_encounters: JSON.stringify(getMonsterEncounters()),
+        is_active: document.getElementById('is-active').value === 'true',
+        notes: document.getElementById('notes').value || null
+    };
+
+    try {
+        const response = await fetch(`/api/adventure-sheets/${sheetData.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+            showToast('Feuille sauvegardée avec succès', 'success');
+            // Mettre à jour les données locales
+            Object.assign(sheetData, formData);
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la sauvegarde', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+
+function showToast(message, type) {
+    // Implémentation simple de toast (à améliorer selon vos besoins)
+    alert(message);
+}
+</script>
+{% endblock %}

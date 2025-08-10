@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Séries - LDVH Companion{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="medieval-font text-4xl text-amber-800">
+        <i class="fas fa-books mr-4"></i>
+        Gestion des Séries
+    </h1>
+    <button onclick="openCreateModal()"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+        <i class="fas fa-plus mr-2"></i>
+        Nouvelle Série
+    </button>
+</div>
+
+<!-- Liste des séries -->
+<div id="series-container" class="space-y-4">
+    <!-- Les séries seront chargées dynamiquement -->
+</div>
+
+<!-- Modal de création/édition -->
+<div id="series-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" id="modal-title">Nouvelle Série</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <form id="series-form" class="space-y-6">
+                    <input type="hidden" id="series-id">
+
+                    <div>
+                        <label for="series-name" class="block text-sm font-medium text-gray-700 mb-2">Nom de la série *</label>
+                        <input type="text" id="series-name" required maxlength="100"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+
+                    <div>
+                        <label for="series-description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="series-description" rows="3"
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-4 pt-4">
+                        <button type="button" onclick="closeModal()"
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-md">
+                            Annuler
+                        </button>
+                        <button type="submit"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md">
+                            <span id="submit-text">Créer</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentSeries = [];
+
+// Charger les séries au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadSeries();
+});
+
+async function loadSeries() {
+    try {
+        const response = await fetch('/api/series');
+        if (response.ok) {
+            currentSeries = await response.json();
+            displaySeries();
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des séries:', error);
+    }
+}
+
+function displaySeries() {
+    const container = document.getElementById('series-container');
+
+    if (currentSeries.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-books text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucune série</h3>
+                <p class="text-gray-500">Créez votre première série pour commencer !</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = currentSeries.map(series => `
+        <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                        <i class="fas fa-books mr-2 text-amber-600"></i>${series.name}
+                    </h3>
+                    <p class="text-gray-600">${series.description || 'Aucune description'}</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="editSeries(${series.id})" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteSeries(${series.id})" class="text-red-600 hover:text-red-700">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-xs text-gray-500">
+                Créée le ${new Date(series.created_at).toLocaleDateString('fr-FR')}
+                ${series.updated_at !== series.created_at ? `• Modifiée le ${new Date(series.updated_at).toLocaleDateString('fr-FR')}` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function openCreateModal() {
+    document.getElementById('modal-title').textContent = 'Nouvelle Série';
+    document.getElementById('submit-text').textContent = 'Créer';
+    document.getElementById('series-form').reset();
+    document.getElementById('series-id').value = '';
+    document.getElementById('series-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('series-modal').classList.add('hidden');
+}
+
+// Gestion du formulaire
+document.getElementById('series-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = {
+        name: document.getElementById('series-name').value,
+        description: document.getElementById('series-description').value || null
+    };
+
+    const seriesId = document.getElementById('series-id').value;
+    const isEdit = seriesId !== '';
+
+    try {
+        const url = isEdit ? `/api/series/${seriesId}` : '/api/series';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+            showToast(isEdit ? 'Série mise à jour avec succès' : 'Série créée avec succès', 'success');
+            closeModal();
+            loadSeries();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la sauvegarde', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+});
+
+async function editSeries(seriesId) {
+    const series = currentSeries.find(s => s.id === seriesId);
+    if (!series) return;
+
+    document.getElementById('modal-title').textContent = 'Modifier la Série';
+    document.getElementById('submit-text').textContent = 'Mettre à jour';
+    document.getElementById('series-id').value = series.id;
+    document.getElementById('series-name').value = series.name;
+    document.getElementById('series-description').value = series.description || '';
+
+    document.getElementById('series-modal').classList.remove('hidden');
+}
+
+async function deleteSeries(seriesId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette série ? Cette action supprimera également tous les livres et feuilles d\'aventures associés.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/series/${seriesId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showToast('Série supprimée avec succès', 'success');
+            loadSeries();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la suppression', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+</script>
+{% endblock %}

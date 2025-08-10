@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Livres - LDVH Companion{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="medieval-font text-4xl text-amber-800">
+        <i class="fas fa-book mr-4"></i>
+        Gestion des Livres
+    </h1>
+    <button onclick="openCreateModal()"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+        <i class="fas fa-plus mr-2"></i>
+        Nouveau Livre
+    </button>
+</div>
+
+<!-- Filtres -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="series-filter" class="block text-sm font-medium text-gray-700 mb-2">Série</label>
+            <select id="series-filter" onchange="filterBooks()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="">Toutes les séries</option>
+            </select>
+        </div>
+        <div>
+            <label for="search-filter" class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
+            <input type="text" id="search-filter" placeholder="Rechercher par titre..." oninput="filterBooks()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+        </div>
+    </div>
+</div>
+
+<!-- Liste des livres -->
+<div id="books-container" class="space-y-4">
+    <!-- Les livres seront chargés dynamiquement -->
+</div>
+
+<!-- Modal de création/édition -->
+<div id="book-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" id="modal-title">Nouveau Livre</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <form id="book-form" class="space-y-6">
+                    <input type="hidden" id="book-id">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="modal-series" class="block text-sm font-medium text-gray-700 mb-2">Série *</label>
+                            <select id="modal-series" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="">Sélectionner une série</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="book-number" class="block text-sm font-medium text-gray-700 mb-2">Numéro de tome *</label>
+                            <input type="number" id="book-number" required min="1" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="book-title" class="block text-sm font-medium text-gray-700 mb-2">Titre du livre *</label>
+                        <input type="text" id="book-title" required maxlength="200" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+
+                    <div>
+                        <label for="book-description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="book-description" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-4 pt-4">
+                        <button type="button" onclick="closeModal()"
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-md">
+                            Annuler
+                        </button>
+                        <button type="submit"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md">
+                            <span id="submit-text">Créer</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentBooks = [];
+let currentSeries = [];
+
+// Charger les données au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadSeries();
+    loadBooks();
+});
+
+async function loadSeries() {
+    try {
+        const response = await fetch('/api/series');
+        if (response.ok) {
+            currentSeries = await response.json();
+            populateSeriesFilters();
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des séries:', error);
+    }
+}
+
+async function loadBooks() {
+    try {
+        const response = await fetch('/api/books');
+        if (response.ok) {
+            currentBooks = await response.json();
+            displayBooks(currentBooks);
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des livres:', error);
+    }
+}
+
+function populateSeriesFilters() {
+    const seriesFilter = document.getElementById('series-filter');
+    const modalSeries = document.getElementById('modal-series');
+
+    const options = currentSeries.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    seriesFilter.innerHTML = '<option value="">Toutes les séries</option>' + options;
+    modalSeries.innerHTML = '<option value="">Sélectionner une série</option>' + options;
+}
+
+function displayBooks(books) {
+    const container = document.getElementById('books-container');
+
+    if (books.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-book text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun livre</h3>
+                <p class="text-gray-500">Créez votre premier livre pour commencer !</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = books.map(book => {
+        const series = currentSeries.find(s => s.id === book.series_id);
+
+        return `
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                            <i class="fas fa-book mr-2 text-blue-600"></i>${book.title}
+                            <span class="text-sm text-gray-500 ml-2">(Tome ${book.book_number})</span>
+                        </h3>
+                        <p class="text-gray-600">
+                            <span class="font-medium">Série:</span> ${series ? series.name : 'Série inconnue'}
+                        </p>
+                        ${book.description ? `<p class="text-gray-600 mt-2">${book.description}</p>` : ''}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="editBook(${book.id})" class="text-blue-600 hover:text-blue-700">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteBook(${book.id})" class="text-red-600 hover:text-red-700">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-xs text-gray-500">
+                    Créé le ${new Date(book.created_at).toLocaleDateString('fr-FR')}
+                    ${book.updated_at !== book.created_at ? `• Modifié le ${new Date(book.updated_at).toLocaleDateString('fr-FR')}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterBooks() {
+    const seriesFilter = document.getElementById('series-filter').value;
+    const searchFilter = document.getElementById('search-filter').value.toLowerCase();
+
+    let filteredBooks = currentBooks;
+
+    if (seriesFilter) {
+        filteredBooks = filteredBooks.filter(b => b.series_id == seriesFilter);
+    }
+
+    if (searchFilter) {
+        filteredBooks = filteredBooks.filter(b =>
+            b.title.toLowerCase().includes(searchFilter) ||
+            (b.description && b.description.toLowerCase().includes(searchFilter))
+        );
+    }
+
+    displayBooks(filteredBooks);
+}
+
+function openCreateModal() {
+    document.getElementById('modal-title').textContent = 'Nouveau Livre';
+    document.getElementById('submit-text').textContent = 'Créer';
+    document.getElementById('book-form').reset();
+    document.getElementById('book-id').value = '';
+    document.getElementById('book-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('book-modal').classList.add('hidden');
+}
+
+// Gestion du formulaire
+document.getElementById('book-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = {
+        series_id: parseInt(document.getElementById('modal-series').value),
+        book_number: parseInt(document.getElementById('book-number').value),
+        title: document.getElementById('book-title').value,
+        description: document.getElementById('book-description').value || null
+    };
+
+    const bookId = document.getElementById('book-id').value;
+    const isEdit = bookId !== '';
+
+    try {
+        const url = isEdit ? `/api/books/${bookId}` : '/api/books';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+            showToast(isEdit ? 'Livre mis à jour avec succès' : 'Livre créé avec succès', 'success');
+            closeModal();
+            loadBooks();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la sauvegarde', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+});
+
+async function editBook(bookId) {
+    const book = currentBooks.find(b => b.id === bookId);
+    if (!book) return;
+
+    document.getElementById('modal-title').textContent = 'Modifier le Livre';
+    document.getElementById('submit-text').textContent = 'Mettre à jour';
+    document.getElementById('book-id').value = book.id;
+    document.getElementById('modal-series').value = book.series_id;
+    document.getElementById('book-number').value = book.book_number;
+    document.getElementById('book-title').value = book.title;
+    document.getElementById('book-description').value = book.description || '';
+
+    document.getElementById('book-modal').classList.remove('hidden');
+}
+
+async function deleteBook(bookId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce livre ? Cette action supprimera également toutes les feuilles d\'aventures associées.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/books/${bookId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showToast('Livre supprimé avec succès', 'success');
+            loadBooks();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la suppression', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+</script>
+{% endblock %}

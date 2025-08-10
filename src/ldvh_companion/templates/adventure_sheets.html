@@ -1,0 +1,520 @@
+{% extends "base.html" %}
+
+{% block title %}Feuilles d'Aventures - LDVH Companion{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="medieval-font text-4xl text-amber-800">
+        <i class="fas fa-scroll mr-4"></i>
+        Feuilles d'Aventures
+    </h1>
+    <button onclick="openCreateModal()"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+        <i class="fas fa-plus mr-2"></i>
+        Nouvelle Fiche
+    </button>
+</div>
+
+<!-- Filtres -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label for="series-filter" class="block text-sm font-medium text-gray-700 mb-2">Série</label>
+            <select id="series-filter" onchange="filterSheets()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="">Toutes les séries</option>
+            </select>
+        </div>
+        <div>
+            <label for="book-filter" class="block text-sm font-medium text-gray-700 mb-2">Livre</label>
+            <select id="book-filter" onchange="filterSheets()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="">Tous les livres</option>
+            </select>
+        </div>
+        <div>
+            <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+            <select id="status-filter" onchange="filterSheets()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                <option value="">Tous les statuts</option>
+                <option value="true">Actives</option>
+                <option value="false">Terminées</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des feuilles d'aventures -->
+<div id="sheets-container" class="space-y-4">
+    <!-- Les feuilles seront chargées dynamiquement -->
+</div>
+
+<!-- Modal de création/édition -->
+<div id="sheet-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" id="modal-title">Nouvelle Feuille d'Aventure</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <form id="sheet-form" class="space-y-6">
+                    <input type="hidden" id="sheet-id">
+
+                    <!-- Sélection du livre -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="modal-series" class="block text-sm font-medium text-gray-700 mb-2">Série *</label>
+                            <select id="modal-series" required onchange="loadBooksForSeries()" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="">Sélectionner une série</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="modal-book" class="block text-sm font-medium text-gray-700 mb-2">Livre *</label>
+                            <select id="modal-book" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="">Sélectionner un livre</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Informations du personnage -->
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-sm text-gray-600">Les statistiques du personnage seront calculées automatiquement</p>
+                    </div>
+
+                    <!-- Statistiques -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Statistiques du Personnage</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label for="skill" class="block text-sm font-medium text-gray-700 mb-2">Habileté</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="skill" min="7" max="12" class="flex-1 border border-gray-300 rounded-md px-3 py-2">
+                                    <button type="button" onclick="rollDice('1d6').then(result => document.getElementById('skill').value = 6 + result)"
+                                            class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md">
+                                        <i class="fas fa-dice"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">6 + 1d6 (7-12)</p>
+                            </div>
+
+                            <div>
+                                <label for="stamina" class="block text-sm font-medium text-gray-700 mb-2">Endurance</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="stamina" min="14" max="24" class="flex-1 border border-gray-300 rounded-md px-3 py-2">
+                                    <button type="button" onclick="rollDice('2d6').then(result => document.getElementById('stamina').value = 12 + result)"
+                                            class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md">
+                                        <i class="fas fa-dice-d20"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">12 + 2d6 (14-24)</p>
+                            </div>
+
+                            <div>
+                                <label for="luck" class="block text-sm font-medium text-gray-700 mb-2">Chance</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="number" id="luck" min="7" max="12" class="flex-1 border border-gray-300 rounded-md px-3 py-2">
+                                    <button type="button" onclick="rollDice('1d6').then(result => document.getElementById('luck').value = 6 + result)"
+                                            class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md">
+                                        <i class="fas fa-dice"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">6 + 1d6 (7-12)</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-center">
+                            <button type="button" onclick="calculateInitialStats().then(stats => {
+                                document.getElementById('skill').value = stats.skill;
+                                document.getElementById('stamina').value = stats.stamina;
+                                document.getElementById('luck').value = stats.luck;
+                            })"
+                                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md">
+                                <i class="fas fa-magic mr-2"></i>
+                                Calculer automatiquement
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Inventaire -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="gold" class="block text-sm font-medium text-gray-700 mb-2">Or</label>
+                            <input type="number" id="gold" min="0" value="0" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                        <div>
+                            <label for="jewelry" class="block text-sm font-medium text-gray-700 mb-2">Bijoux</label>
+                            <input type="text" id="jewelry" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="potions" class="block text-sm font-medium text-gray-700 mb-2">Potions</label>
+                            <input type="text" id="potions" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                        <div>
+                            <label for="provisions" class="block text-sm font-medium text-gray-700 mb-2">Provisions</label>
+                            <input type="text" id="provisions" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="equipment" class="block text-sm font-medium text-gray-700 mb-2">Équipement transporté</label>
+                        <textarea id="equipment" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                    </div>
+
+                    <!-- Notes et statut -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                            <textarea id="notes" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                        </div>
+                        <div>
+                            <label for="is-active" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                            <select id="is-active" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="true">Active</option>
+                                <option value="false">Terminée</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Boutons d'action -->
+                    <div class="flex justify-end space-x-4 pt-4">
+                        <button type="button" onclick="closeModal()"
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-md">
+                            Annuler
+                        </button>
+                        <button type="submit"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md">
+                            <span id="submit-text">Créer</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentSheets = [];
+let currentSeries = [];
+let currentBooks = [];
+
+// Charger les données au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadSeries();
+    loadBooks();
+    loadAdventureSheets();
+});
+
+async function loadSeries() {
+    try {
+        const response = await fetch('/api/series');
+        if (response.ok) {
+            currentSeries = await response.json();
+            populateSeriesFilters();
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des séries:', error);
+    }
+}
+
+async function loadBooks() {
+    try {
+        const response = await fetch('/api/books');
+        if (response.ok) {
+            currentBooks = await response.json();
+            populateBookFilters();
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des livres:', error);
+    }
+}
+
+async function loadAdventureSheets() {
+    try {
+        const response = await fetch('/api/adventure-sheets');
+        if (response.ok) {
+            currentSheets = await response.json();
+            displaySheets(currentSheets);
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des feuilles:', error);
+    }
+}
+
+function populateSeriesFilters() {
+    const seriesFilter = document.getElementById('series-filter');
+    const modalSeries = document.getElementById('modal-series');
+
+    const options = currentSeries.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    seriesFilter.innerHTML = '<option value="">Toutes les séries</option>' + options;
+    modalSeries.innerHTML = '<option value="">Sélectionner une série</option>' + options;
+}
+
+function populateBookFilters() {
+    const bookFilter = document.getElementById('book-filter');
+    const options = currentBooks.map(b => `<option value="${b.id}">${b.title}</option>`).join('');
+    bookFilter.innerHTML = '<option value="">Tous les livres</option>' + options;
+}
+
+function displaySheets(sheets) {
+    const container = document.getElementById('sheets-container');
+
+    if (sheets.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-scroll text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucune feuille d'aventure</h3>
+                <p class="text-gray-500">Créez votre première feuille d'aventure pour commencer !</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = sheets.map(sheet => {
+        const book = currentBooks.find(b => b.id === sheet.book_id);
+        const series = book ? currentSeries.find(s => s.id === book.series_id) : null;
+
+        return `
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                            <i class="fas fa-scroll mr-2 text-green-600"></i>${book ? book.title : 'Livre inconnu'}
+                            <span class="text-sm text-gray-500 ml-2">(Tentative ${sheet.attempt_number})</span>
+                        </h3>
+                        <p class="text-gray-600">
+                            <span class="font-medium">Série:</span> ${series ? series.name : 'Inconnue'}
+                        </p>
+                        ${sheet.character_name ? `<p class="text-gray-600"><span class="font-medium">Personnage:</span> ${sheet.character_name}</p>` : ''}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${sheet.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${sheet.is_active ? 'Active' : 'Terminée'}
+                        </span>
+                        <a href="/adventure-sheets/${sheet.id}/game" class="text-green-600 hover:text-green-700" title="Mode jeu">
+                            <i class="fas fa-gamepad"></i>
+                        </a>
+                        <button onclick="editSheet(${sheet.id})" class="text-blue-600 hover:text-blue-700">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteSheet(${sheet.id})" class="text-red-600 hover:text-red-700">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-amber-600">${sheet.current_skill}</div>
+                        <div class="text-sm text-gray-500">Habileté</div>
+                        <div class="text-xs text-gray-400">Initiale: ${sheet.initial_skill}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">${sheet.current_stamina}</div>
+                        <div class="text-sm text-gray-500">Endurance</div>
+                        <div class="text-xs text-gray-400">Initiale: ${sheet.initial_stamina}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">${sheet.current_luck}</div>
+                        <div class="text-sm text-gray-500">Chance</div>
+                        <div class="text-xs text-gray-400">Initiale: ${sheet.initial_luck}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="font-medium">Or:</span> ${sheet.gold}
+                        ${sheet.jewelry ? `<br><span class="font-medium">Bijoux:</span> ${sheet.jewelry}` : ''}
+                        ${sheet.potions ? `<br><span class="font-medium">Potions:</span> ${sheet.potions}` : ''}
+                    </div>
+                    <div>
+                        ${sheet.provisions ? `<span class="font-medium">Provisions:</span> ${sheet.provisions}<br>` : ''}
+                        ${sheet.equipment ? `<span class="font-medium">Équipement:</span> ${sheet.equipment.substring(0, 50)}${sheet.equipment.length > 50 ? '...' : ''}` : ''}
+                    </div>
+                </div>
+
+                ${sheet.notes ? `<div class="mt-4 p-3 bg-gray-50 rounded-lg"><span class="font-medium">Notes:</span> ${sheet.notes}</div>` : ''}
+
+                <div class="mt-4 text-xs text-gray-500">
+                    Créée le ${new Date(sheet.created_at).toLocaleDateString('fr-FR')}
+                    ${sheet.updated_at !== sheet.created_at ? `• Modifiée le ${new Date(sheet.updated_at).toLocaleDateString('fr-FR')}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterSheets() {
+    const seriesFilter = document.getElementById('series-filter').value;
+    const bookFilter = document.getElementById('book-filter').value;
+    const statusFilter = document.getElementById('status-filter').value;
+
+    let filteredSheets = currentSheets;
+
+    if (seriesFilter) {
+        const seriesBooks = currentBooks.filter(b => b.series_id == seriesFilter).map(b => b.id);
+        filteredSheets = filteredSheets.filter(s => seriesBooks.includes(s.book_id));
+    }
+
+    if (bookFilter) {
+        filteredSheets = filteredSheets.filter(s => s.book_id == bookFilter);
+    }
+
+    if (statusFilter !== '') {
+        filteredSheets = filteredSheets.filter(s => s.is_active == (statusFilter === 'true'));
+    }
+
+    displaySheets(filteredSheets);
+}
+
+function openCreateModal() {
+    document.getElementById('modal-title').textContent = 'Nouvelle Feuille d\'Aventure';
+    document.getElementById('submit-text').textContent = 'Créer';
+    document.getElementById('sheet-form').reset();
+    document.getElementById('sheet-id').value = '';
+
+    // Calculer automatiquement le numéro de tentative
+    const bookSelect = document.getElementById('modal-book');
+    if (bookSelect.value) {
+        const bookId = parseInt(bookSelect.value);
+        const bookSheets = currentSheets.filter(s => s.book_id === bookId);
+        const nextAttempt = bookSheets.length > 0 ? Math.max(...bookSheets.map(s => s.attempt_number)) + 1 : 1;
+        document.getElementById('attempt-number').value = nextAttempt;
+    }
+
+    document.getElementById('sheet-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('sheet-modal').classList.add('hidden');
+}
+
+async function loadBooksForSeries() {
+    const seriesId = document.getElementById('modal-series').value;
+    const bookSelect = document.getElementById('modal-book');
+
+    bookSelect.innerHTML = '<option value="">Sélectionner un livre</option>';
+
+    if (seriesId) {
+        const seriesBooks = currentBooks.filter(b => b.series_id == seriesId);
+        const options = seriesBooks.map(b => `<option value="${b.id}">${b.title}</option>`).join('');
+        bookSelect.innerHTML = '<option value="">Sélectionner un livre</option>' + options;
+    }
+
+    // Mettre à jour le numéro de tentative
+    if (bookSelect.value) {
+        const bookId = parseInt(bookSelect.value);
+        const bookSheets = currentSheets.filter(s => s.book_id === bookId);
+        const nextAttempt = bookSheets.length > 0 ? Math.max(...bookSheets.map(s => s.attempt_number)) + 1 : 1;
+        document.getElementById('attempt-number').value = nextAttempt;
+    }
+}
+
+// Gestion du formulaire
+document.getElementById('sheet-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = {
+        book_id: parseInt(document.getElementById('modal-book').value),
+        initial_skill: parseInt(document.getElementById('skill').value),
+        initial_stamina: parseInt(document.getElementById('stamina').value),
+        initial_luck: parseInt(document.getElementById('luck').value),
+        gold: parseInt(document.getElementById('gold').value) || 0,
+        jewelry: document.getElementById('jewelry').value || null,
+        potions: document.getElementById('potions').value || null,
+        provisions: document.getElementById('provisions').value || null,
+        equipment: document.getElementById('equipment').value || null,
+        notes: document.getElementById('notes').value || null,
+        is_active: document.getElementById('is-active').value === 'true'
+    };
+
+    const sheetId = document.getElementById('sheet-id').value;
+    const isEdit = sheetId !== '';
+
+    try {
+        const url = isEdit ? `/api/adventure-sheets/${sheetId}` : '/api/adventure-sheets';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+            showToast(isEdit ? 'Feuille mise à jour avec succès' : 'Feuille créée avec succès', 'success');
+            closeModal();
+            loadAdventureSheets();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la sauvegarde', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+});
+
+async function editSheet(sheetId) {
+    const sheet = currentSheets.find(s => s.id === sheetId);
+    if (!sheet) return;
+
+    const book = currentBooks.find(b => b.id === sheet.book_id);
+    const series = book ? currentSeries.find(s => s.id === book.series_id) : null;
+
+    // Remplir le formulaire
+    document.getElementById('modal-title').textContent = 'Modifier la Feuille d\'Aventure';
+    document.getElementById('submit-text').textContent = 'Mettre à jour';
+    document.getElementById('sheet-id').value = sheet.id;
+
+    // Sélectionner la série et le livre
+    if (series) {
+        document.getElementById('modal-series').value = series.id;
+        await loadBooksForSeries();
+        document.getElementById('modal-book').value = sheet.book_id;
+    }
+
+    // Remplir les autres champs
+    document.getElementById('skill').value = sheet.initial_skill;
+    document.getElementById('stamina').value = sheet.initial_stamina;
+    document.getElementById('luck').value = sheet.initial_luck;
+    document.getElementById('gold').value = sheet.gold;
+    document.getElementById('jewelry').value = sheet.jewelry || '';
+    document.getElementById('potions').value = sheet.potions || '';
+    document.getElementById('provisions').value = sheet.provisions || '';
+    document.getElementById('equipment').value = sheet.equipment || '';
+    document.getElementById('notes').value = sheet.notes || '';
+    document.getElementById('is-active').value = sheet.is_active.toString();
+
+    document.getElementById('sheet-modal').classList.remove('hidden');
+}
+
+async function deleteSheet(sheetId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette feuille d\'aventure ?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/adventure-sheets/${sheetId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showToast('Feuille supprimée avec succès', 'success');
+            loadAdventureSheets();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de la suppression', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+</script>
+{% endblock %}

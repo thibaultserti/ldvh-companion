@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LDVH Companion{% endblock %}</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        .medieval-font {
+            font-family: 'MedievalSharp', cursive;
+        }
+        .modern-font {
+            font-family: 'Inter', sans-serif;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-gradient-to-r from-amber-800 to-amber-900 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-3">
+                        <i class="fas fa-scroll text-2xl"></i>
+                        <span class="medieval-font text-xl font-bold">LDVH Companion</span>
+                    </a>
+                </div>
+
+                <div class="flex items-center space-x-8">
+                    <a href="/" class="hover:text-amber-200 transition-colors duration-200">
+                        <i class="fas fa-home mr-2"></i>Accueil
+                    </a>
+                    <a href="/series" class="hover:text-amber-200 transition-colors duration-200">
+                        <i class="fas fa-books mr-2"></i>Séries
+                    </a>
+                    <a href="/books" class="hover:text-amber-200 transition-colors duration-200">
+                        <i class="fas fa-book mr-2"></i>Livres
+                    </a>
+                    <a href="/adventure-sheets" class="hover:text-amber-200 transition-colors duration-200">
+                        <i class="fas fa-scroll mr-2"></i>Feuilles d'Aventures
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenu principal -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <p class="text-gray-300">
+                    <i class="fas fa-scroll mr-2"></i>
+                    LDVH Companion - Suivi de vos feuilles d'aventures
+                </p>
+                <p class="text-gray-400 text-sm mt-2">
+                    Créez, gérez et suivez vos aventures dans les livres dont vous êtes le héros
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50"></div>
+
+    <script>
+        // Fonction utilitaire pour afficher des notifications toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const bgColor = type === 'success' ? 'bg-green-500' :
+                           type === 'error' ? 'bg-red-500' :
+                           type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+
+            toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg mb-2 transform transition-all duration-300 translate-x-full`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            // Animation d'entrée
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 100);
+
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300);
+            }, 5000);
+        }
+
+        // Fonction pour lancer des dés
+        async function rollDice(diceType) {
+            try {
+                const response = await fetch(`/api/dice/${diceType}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showToast(`${diceType.toUpperCase()}: ${result.result}`, 'success');
+                    return result.result;
+                } else {
+                    showToast('Erreur lors du lancement des dés', 'error');
+                }
+            } catch (error) {
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+
+        // Fonction pour calculer les statistiques initiales
+        async function calculateInitialStats() {
+            try {
+                const response = await fetch('/api/dice/calculate-stats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    showToast(`Stats calculées: H=${stats.skill}, E=${stats.stamina}, C=${stats.luck}`, 'success');
+                    return stats;
+                } else {
+                    showToast('Erreur lors du calcul des stats', 'error');
+                }
+            } catch (error) {
+                showToast('Erreur de connexion', 'error');
+            }
+        }
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
