@@ -23,4 +23,5 @@ USER ${USER}:${USER}
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-ENTRYPOINT ["python3", "src/main.py"]
+ENTRYPOINT ["/bin/bash"]
+#ENTRYPOINT ["python3", "src/main.py"]
