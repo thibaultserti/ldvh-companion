@@ -16,6 +16,9 @@ from .models import (
     Book,
     BookCreate,
     BookResponse,
+    CombatAction,
+    CombatStart,
+    CombatState,
     DiceRoll,
     Series,
     SeriesCreate,
@@ -23,10 +26,12 @@ from .models import (
 )
 from .utils import (
     calculate_initial_stats,
+    execute_combat_round,
     get_next_attempt_number,
     parse_monster_encounters,
     roll_1d6,
     roll_2d6,
+    start_combat,
     validate_character_stats,
 )
 
@@ -86,7 +91,7 @@ async def adventure_sheet_game_page(request: Request, sheet_id: int, db: Session
     monster_encounters = []
     if sheet.monster_encounters:
         try:
-            monster_encounters = parse_monster_encounters(sheet.monster_encounters)
+            monster_encounters = parse_monster_encounters(sheet.monster_encounters or "")
         except:
             monster_encounters = []
 
@@ -108,6 +113,8 @@ async def adventure_sheet_game_page(request: Request, sheet_id: int, db: Session
         "provisions": sheet.provisions,
         "equipment": sheet.equipment,
         "monster_encounters": monster_encounters,
+        "active_combats": sheet.active_combats if sheet.active_combats else "{}",
+        "combat_history": sheet.combat_history if sheet.combat_history else "[]",
         "is_active": sheet.is_active,
         "notes": sheet.notes,
         "series_name": series.name,
@@ -301,6 +308,8 @@ async def create_adventure_sheet(sheet: AdventureSheetCreate, db: Session = Depe
         provisions=None,
         equipment=None,
         monster_encounters=None,
+        active_combats=None,
+        combat_history=None,
         is_active=True,
         notes=None,
     )
@@ -364,7 +373,7 @@ async def delete_adventure_sheet(sheet_id: int, db: Session = Depends(get_db)) -
 
 # Utilitaires pour les dés
 @app.post("/api/dice/roll")
-async def roll_dice_endpoint(dice_roll: DiceRoll):
+async def roll_dice_endpoint(dice_roll: DiceRoll) -> dict:
     """Lance des dés selon la configuration spécifiée."""
     from .utils import roll_dice
 
@@ -378,14 +387,14 @@ async def roll_dice_endpoint(dice_roll: DiceRoll):
 
 
 @app.post("/api/dice/1d6")
-async def roll_1d6_endpoint():
+async def roll_1d6_endpoint() -> dict:
     """Lance 1d6."""
     result = roll_1d6()
     return {"dice": "1d6", "result": result}
 
 
 @app.post("/api/dice/2d6")
-async def roll_2d6_endpoint():
+async def roll_2d6_endpoint() -> dict:
     """Lance 2d6."""
     result = roll_2d6()
     rolls = [roll_1d6() for _ in range(2)]
@@ -393,7 +402,7 @@ async def roll_2d6_endpoint():
 
 
 @app.post("/api/dice/calculate-stats")
-async def calculate_stats_endpoint():
+async def calculate_stats_endpoint() -> dict:
     """Calcule les statistiques initiales d'un personnage."""
     skill, stamina, luck = calculate_initial_stats()
     return {
@@ -406,9 +415,54 @@ async def calculate_stats_endpoint():
     }
 
 
+# Endpoints pour le système de combat
+@app.post("/api/combat/start", response_model=CombatState)
+async def start_combat_endpoint(combat_start: CombatStart, sheet_id: int, db: Session = Depends(get_db)) -> CombatState:
+    """Commence un nouveau combat avec un monstre."""
+    # Récupérer la feuille d'aventure pour obtenir les stats du joueur
+    sheet = db.query(AdventureSheet).filter(AdventureSheet.id == sheet_id).first()
+    if not sheet:
+        raise HTTPException(status_code=404, detail="Feuille d'aventure non trouvée")
+
+    # Commencer le combat
+    combat_state = start_combat(
+        monster_name=combat_start.monster_name,
+        monster_skill=combat_start.monster_skill,
+        monster_stamina=combat_start.monster_stamina,
+        player_skill=sheet.current_skill,
+        player_stamina=sheet.current_stamina,
+        player_luck=sheet.current_luck,
+    )
+
+    return combat_state
+
+
+@app.post("/api/combat/round")
+async def execute_combat_round_endpoint(
+    combat_state: CombatState, action: CombatAction, sheet_id: int, db: Session = Depends(get_db)
+) -> dict:
+    """Exécute un round de combat."""
+    # Vérifier que la feuille d'aventure existe
+    sheet = db.query(AdventureSheet).filter(AdventureSheet.id == sheet_id).first()
+    if not sheet:
+        raise HTTPException(status_code=404, detail="Feuille d'aventure non trouvée")
+
+    # Exécuter le round de combat
+    round_result, new_combat_state = execute_combat_round(combat_state=combat_state, attempt_luck=action.attempt_luck)
+
+    # Mettre à jour les statistiques du joueur dans la base de données
+    if round_result.combat_ended:
+        sheet.current_stamina = round_result.player_stamina_after
+        sheet.current_luck = round_result.player_luck_after
+        db.commit()
+        db.refresh(sheet)
+
+    return {"round_result": round_result, "new_combat_state": new_combat_state}
+
+
 # Initialisation de la base de données
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Événement de démarrage de l'application."""
     create_tables()
     init_db()

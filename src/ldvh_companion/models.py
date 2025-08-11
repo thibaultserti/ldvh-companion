@@ -73,6 +73,12 @@ class AdventureSheet(Base):
     # Monstres rencontrés (JSON stocké en texte)
     monster_encounters = Column(Text, nullable=True)
 
+    # États des combats actifs (JSON stocké en texte)
+    active_combats = Column(Text, nullable=True)
+
+    # Historique des combats terminés (JSON stocké en texte)
+    combat_history = Column(Text, nullable=True)
+
     # Métadonnées
     is_active = Column(Boolean, default=True)  # Fiche active ou terminée
     notes = Column(Text, nullable=True)
@@ -152,6 +158,8 @@ class AdventureSheetUpdate(BaseModel):
     provisions: str | None = None
     equipment: str | None = None
     monster_encounters: str | None = None
+    active_combats: str | None = None
+    combat_history: str | None = None
     is_active: bool | None = None
     notes: str | None = None
 
@@ -175,6 +183,8 @@ class AdventureSheetResponse(BaseModel):
     provisions: str | None = None
     equipment: str | None = None
     monster_encounters: str | None = None
+    active_combats: str | None = None
+    combat_history: str | None = None
     is_active: bool
     notes: str | None = None
     created_at: datetime
@@ -189,3 +199,71 @@ class DiceRoll(BaseModel):
 
     dice_count: int = Field(..., ge=1, le=10)
     sides: int = Field(default=6, ge=2, le=100)
+
+
+# Modèles pour le système de combat
+class CombatState(BaseModel):
+    """État d'un combat en cours."""
+
+    monster_name: str
+    monster_skill: int
+    monster_stamina: int
+    monster_max_stamina: int
+
+    player_skill: int
+    player_stamina: int
+    player_luck: int
+    player_max_luck: int
+
+    round_number: int = 1
+    is_active: bool = True
+    winner: str | None = None  # "player", "monster", ou None si combat en cours
+
+
+class CombatRoundResult(BaseModel):
+    """Résultat d'un round de combat."""
+
+    round_number: int
+
+    # Lancer de dés
+    player_dice: list[int]
+    monster_dice: list[int]
+
+    # Force d'attaque calculée
+    player_attack_strength: int
+    monster_attack_strength: int
+
+    # Résultat du round
+    winner: str  # "player", "monster", "draw"
+
+    # Test de chance (si applicable)
+    luck_attempted: bool = False
+    luck_dice: list[int] | None = None
+    luck_success: bool | None = None
+
+    # Dégâts infligés
+    damage_to_player: int = 0
+    damage_to_monster: int = 0
+
+    # État après le round
+    player_stamina_after: int
+    monster_stamina_after: int
+    player_luck_after: int
+
+    # Combat terminé ?
+    combat_ended: bool = False
+    combat_winner: str | None = None
+
+
+class CombatAction(BaseModel):
+    """Action du joueur pour un round de combat."""
+
+    attempt_luck: bool = False
+
+
+class CombatStart(BaseModel):
+    """Données pour commencer un combat."""
+
+    monster_name: str
+    monster_skill: int
+    monster_stamina: int

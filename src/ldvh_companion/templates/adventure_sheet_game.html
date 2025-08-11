@@ -148,10 +148,21 @@
     </select>
 </div>
 
+<!-- Historique des combats -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">📚 Historique des combats</h2>
+    <div id="combat-history-list" class="space-y-4">
+        <!-- L'historique sera ajouté ici dynamiquement -->
+    </div>
+    <div id="no-combat-history" class="text-gray-500 italic text-center py-8">
+        Aucun combat terminé pour le moment
+    </div>
+</div>
+
 <!-- Template pour une rencontre de monstre -->
 <template id="monster-encounter-template">
     <div class="monster-encounter border border-gray-300 rounded-lg p-4 mb-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Nom du monstre</label>
                 <input type="text" class="monster-name w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Nom du monstre">
@@ -169,9 +180,74 @@
                 <input type="number" class="monster-stamina w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Endurance">
             </div>
         </div>
-        <button onclick="removeMonsterEncounter(this)" class="mt-2 text-red-600 hover:text-red-700">
-            <i class="fas fa-trash mr-1"></i>Supprimer
-        </button>
+
+        <!-- Interface de combat -->
+        <div class="combat-interface bg-gray-50 rounded-lg p-4 mb-4" style="display: none;">
+            <h4 class="text-lg font-bold text-gray-800 mb-4">⚔️ Combat en cours</h4>
+
+            <!-- État du combat -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h5 class="font-bold text-blue-800 mb-2">🛡️ Joueur</h5>
+                    <div class="text-sm space-y-1">
+                        <div>Habileté: <span class="combat-player-skill font-bold"></span></div>
+                        <div>Endurance: <span class="combat-player-stamina font-bold text-red-600"></span></div>
+                        <div>Chance: <span class="combat-player-luck font-bold text-green-600"></span></div>
+                    </div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-4">
+                    <h5 class="font-bold text-red-800 mb-2">👹 <span class="combat-monster-name"></span></h5>
+                    <div class="text-sm space-y-1">
+                        <div>Habileté: <span class="combat-monster-skill font-bold"></span></div>
+                        <div>Endurance: <span class="combat-monster-stamina font-bold text-red-600"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Round actuel -->
+            <div class="bg-white rounded-lg border-2 border-amber-200 p-4 mb-4">
+                <h5 class="font-bold text-amber-800 mb-2">Round <span class="combat-round-number"></span></h5>
+                <div class="combat-round-controls">
+                    <div class="flex items-center space-x-4 mb-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="attempt-luck-checkbox mr-2">
+                            <span class="text-sm font-medium">Tenter ma chance</span>
+                        </label>
+                    </div>
+                    <button onclick="executeRound(this)" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        🎲 Attaquer !
+                    </button>
+                </div>
+            </div>
+
+            <!-- Historique des rounds -->
+            <div class="combat-history">
+                <h5 class="font-bold text-gray-800 mb-2">Historique des rounds</h5>
+                <div class="combat-rounds-list space-y-2 max-h-60 overflow-y-auto">
+                    <!-- Les rounds seront ajoutés ici dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Résultat final -->
+            <div class="combat-result bg-green-50 rounded-lg p-4 mt-4" style="display: none;">
+                <h5 class="font-bold text-green-800 mb-2">🏆 Combat terminé !</h5>
+                <div class="combat-result-text text-sm"></div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center">
+            <div>
+                <button onclick="startCombat(this)" class="combat-start-btn bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mr-2">
+                    ⚔️ Combattre
+                </button>
+                <button onclick="removeMonsterEncounter(this)" class="text-red-600 hover:text-red-700">
+                    <i class="fas fa-trash mr-1"></i>Supprimer
+                </button>
+            </div>
+            <button onclick="endCombat(this)" class="combat-end-btn bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" style="display: none;">
+                ❌ Arrêter le combat
+            </button>
+        </div>
     </div>
 </template>
 
@@ -193,7 +269,9 @@ const sheetData = {
     potions: "{{ potions or '' }}",
     provisions: "{{ provisions or '' }}",
     equipment: "{{ equipment or '' }}",
-    monster_encounters: {{ monster_encounters or '[]' }},
+    monster_encounters: {{ monster_encounters | tojson | safe }},
+    active_combats: {{ active_combats | safe }},
+    combat_history: {{ combat_history | safe }},
     is_active: {{ 'true' if is_active else 'false' }},
     notes: "{{ notes or '' }}"
 };
@@ -201,6 +279,7 @@ const sheetData = {
 // Charger les rencontres de monstres au chargement de la page
 document.addEventListener('DOMContentLoaded', function() {
     loadMonsterEncounters();
+    loadCombatStates();
 });
 
 function loadMonsterEncounters() {
@@ -227,6 +306,44 @@ function addMonsterEncounter(encounterData = null) {
     }
 
     container.appendChild(clone);
+}
+
+function loadCombatStates() {
+    // Charger l'historique des combats
+    if (sheetData.combat_history && sheetData.combat_history.length > 0) {
+        combatHistory = sheetData.combat_history;
+    }
+
+    // Charger les combats actifs
+    if (sheetData.active_combats && Object.keys(sheetData.active_combats).length > 0) {
+        // Pour chaque combat actif, restaurer l'état
+        Object.entries(sheetData.active_combats).forEach(([monsterName, combatData]) => {
+            // Trouver le monstre correspondant
+            const monsterElements = document.querySelectorAll('.monster-encounter');
+            monsterElements.forEach(element => {
+                const nameField = element.querySelector('.monster-name');
+                if (nameField && nameField.value.trim() === monsterName) {
+                    // Restaurer l'état du combat
+                    const combatState = combatData.state;
+                    const rounds = combatData.rounds || [];
+
+                    activeCombats.set(element, combatState);
+                    showCombatInterface(element, combatState);
+
+                    // Restaurer l'historique des rounds
+                    rounds.forEach(round => {
+                        addRoundToHistory(element, round);
+                    });
+
+                    // Mettre à jour l'affichage
+                    updateCombatDisplay(element, combatState);
+                }
+            });
+        });
+    }
+
+    // Afficher l'historique des combats
+    displayCombatHistory();
 }
 
 function removeMonsterEncounter(button) {
@@ -256,6 +373,29 @@ function getMonsterEncounters() {
     return encounters;
 }
 
+function getActiveCombatStates() {
+    const activeStates = {};
+
+    activeCombats.forEach((combatState, monsterElement) => {
+        const monsterName = monsterElement.querySelector('.monster-name').value.trim();
+        if (monsterName) {
+            // Récupérer l'historique des rounds pour ce combat
+            const roundsHistory = [];
+            const historyContainer = monsterElement.querySelector('.combat-rounds-list');
+            if (historyContainer) {
+                // Pour simplifier, on stocke juste l'état actuel
+                // L'historique sera reconstruit lors du rechargement
+                activeStates[monsterName] = {
+                    state: combatState,
+                    rounds: roundsHistory
+                };
+            }
+        }
+    });
+
+    return activeStates;
+}
+
 async function saveSheet() {
     const formData = {
         character_name: sheetData.character_name,
@@ -268,6 +408,8 @@ async function saveSheet() {
         provisions: document.getElementById('provisions').value || null,
         equipment: document.getElementById('equipment').value || null,
         monster_encounters: JSON.stringify(getMonsterEncounters()),
+        active_combats: JSON.stringify(getActiveCombatStates()),
+        combat_history: JSON.stringify(combatHistory),
         is_active: document.getElementById('is-active').value === 'true',
         notes: document.getElementById('notes').value || null
     };
@@ -297,6 +439,346 @@ async function saveSheet() {
 function showToast(message, type) {
     // Implémentation simple de toast (à améliorer selon vos besoins)
     alert(message);
+}
+
+// Variables globales pour les combats
+let activeCombats = new Map(); // Map de monster-encounter element -> combat state
+let combatHistory = []; // Historique de tous les combats terminés
+
+// Fonctions pour le système de combat
+async function startCombat(button) {
+    const monsterEncounter = button.closest('.monster-encounter');
+    const name = monsterEncounter.querySelector('.monster-name').value.trim();
+    const skill = parseInt(monsterEncounter.querySelector('.monster-skill').value);
+    const stamina = parseInt(monsterEncounter.querySelector('.monster-stamina').value);
+
+    if (!name || !skill || !stamina) {
+        showToast('Veuillez remplir tous les champs du monstre', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/combat/start?sheet_id=${sheetData.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                monster_name: name,
+                monster_skill: skill,
+                monster_stamina: stamina
+            })
+        });
+
+        if (response.ok) {
+            const combatState = await response.json();
+            activeCombats.set(monsterEncounter, combatState);
+
+            // Afficher l'interface de combat
+            showCombatInterface(monsterEncounter, combatState);
+            showToast('Combat commencé !', 'success');
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors du démarrage du combat', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+
+function showCombatInterface(monsterEncounter, combatState) {
+    const combatInterface = monsterEncounter.querySelector('.combat-interface');
+    const startBtn = monsterEncounter.querySelector('.combat-start-btn');
+    const endBtn = monsterEncounter.querySelector('.combat-end-btn');
+
+    // Mettre à jour les informations de combat
+    monsterEncounter.querySelector('.combat-player-skill').textContent = combatState.player_skill;
+    monsterEncounter.querySelector('.combat-player-stamina').textContent = combatState.player_stamina;
+    monsterEncounter.querySelector('.combat-player-luck').textContent = combatState.player_luck;
+
+    monsterEncounter.querySelector('.combat-monster-name').textContent = combatState.monster_name;
+    monsterEncounter.querySelector('.combat-monster-skill').textContent = combatState.monster_skill;
+    monsterEncounter.querySelector('.combat-monster-stamina').textContent = combatState.monster_stamina;
+
+    monsterEncounter.querySelector('.combat-round-number').textContent = combatState.round_number;
+
+    // Vider l'historique des rounds
+    monsterEncounter.querySelector('.combat-rounds-list').innerHTML = '';
+
+    // Afficher/masquer les éléments appropriés
+    combatInterface.style.display = 'block';
+    startBtn.style.display = 'none';
+    endBtn.style.display = 'inline-block';
+
+    // Masquer le résultat final
+    monsterEncounter.querySelector('.combat-result').style.display = 'none';
+}
+
+async function executeRound(button) {
+    const monsterEncounter = button.closest('.monster-encounter');
+    const combatState = activeCombats.get(monsterEncounter);
+
+    if (!combatState) {
+        showToast('Aucun combat en cours', 'error');
+        return;
+    }
+
+    const attemptLuck = monsterEncounter.querySelector('.attempt-luck-checkbox').checked;
+
+    try {
+        const response = await fetch(`/api/combat/round?sheet_id=${sheetData.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                combat_state: combatState,
+                action: {
+                    attempt_luck: attemptLuck
+                }
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            const roundResult = result.round_result;
+            const newCombatState = result.new_combat_state;
+
+            // Mettre à jour l'état du combat
+            activeCombats.set(monsterEncounter, newCombatState);
+
+            // Ajouter le round à l'historique
+            addRoundToHistory(monsterEncounter, roundResult);
+
+            // Mettre à jour l'affichage
+            updateCombatDisplay(monsterEncounter, newCombatState, roundResult);
+
+            // Réinitialiser la checkbox
+            monsterEncounter.querySelector('.attempt-luck-checkbox').checked = false;
+
+            if (roundResult.combat_ended) {
+                endCombat(button, roundResult.combat_winner);
+                // Mettre à jour les stats du joueur dans l'interface
+                updatePlayerStats(roundResult);
+            }
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Erreur lors de l\'exécution du round', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+
+function addRoundToHistory(monsterEncounter, roundResult) {
+    const historyContainer = monsterEncounter.querySelector('.combat-rounds-list');
+
+    const roundDiv = document.createElement('div');
+    roundDiv.className = 'bg-white rounded border p-3 text-sm';
+
+    let resultClass = '';
+    let resultText = '';
+    let resultIcon = '';
+
+    if (roundResult.winner === 'player') {
+        resultClass = 'text-green-600';
+        resultText = 'Victoire du joueur';
+        resultIcon = '✅';
+    } else if (roundResult.winner === 'monster') {
+        resultClass = 'text-red-600';
+        resultText = 'Victoire du monstre';
+        resultIcon = '❌';
+    } else {
+        resultClass = 'text-yellow-600';
+        resultText = 'Égalité';
+        resultIcon = '⚖️';
+    }
+
+    let luckText = '';
+    if (roundResult.luck_attempted) {
+        const luckResult = roundResult.luck_success ? 'Réussi' : 'Échoué';
+        const luckClass = roundResult.luck_success ? 'text-green-600' : 'text-red-600';
+        luckText = `<br>🍀 Test de chance: <span class="${luckClass}">${luckResult}</span> (${roundResult.luck_dice.join('+')})`;
+    }
+
+    roundDiv.innerHTML = `
+        <div class="font-bold ${resultClass}">
+            ${resultIcon} Round ${roundResult.round_number}: ${resultText}
+        </div>
+        <div class="mt-1">
+            🛡️ Joueur: ${roundResult.player_dice.join('+')} + ${roundResult.player_attack_strength - roundResult.player_dice.reduce((a,b) => a+b, 0)} = ${roundResult.player_attack_strength}
+        </div>
+        <div>
+            👹 Monstre: ${roundResult.monster_dice.join('+')} + ${roundResult.monster_attack_strength - roundResult.monster_dice.reduce((a,b) => a+b, 0)} = ${roundResult.monster_attack_strength}
+        </div>
+        ${luckText}
+        <div class="mt-2 text-xs text-gray-600">
+            Dégâts: Joueur -${roundResult.damage_to_player}, Monstre -${roundResult.damage_to_monster}
+        </div>
+    `;
+
+    historyContainer.appendChild(roundDiv);
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+}
+
+function updateCombatDisplay(monsterEncounter, combatState, roundResult) {
+    // Mettre à jour les stats affichées
+    monsterEncounter.querySelector('.combat-player-stamina').textContent = combatState.player_stamina;
+    monsterEncounter.querySelector('.combat-player-luck').textContent = combatState.player_luck;
+    monsterEncounter.querySelector('.combat-monster-stamina').textContent = combatState.monster_stamina;
+    monsterEncounter.querySelector('.combat-round-number').textContent = combatState.round_number;
+}
+
+function updatePlayerStats(roundResult) {
+    // Mettre à jour les stats du joueur dans l'interface principale
+    document.getElementById('current-stamina').value = roundResult.player_stamina_after;
+    document.getElementById('current-luck').value = roundResult.player_luck_after;
+
+    // Mettre à jour sheetData
+    sheetData.current_stamina = roundResult.player_stamina_after;
+    sheetData.current_luck = roundResult.player_luck_after;
+}
+
+function endCombat(button, winner = null) {
+    const monsterEncounter = button.closest('.monster-encounter');
+    const combatInterface = monsterEncounter.querySelector('.combat-interface');
+    const startBtn = monsterEncounter.querySelector('.combat-start-btn');
+    const endBtn = monsterEncounter.querySelector('.combat-end-btn');
+    const resultDiv = monsterEncounter.querySelector('.combat-result');
+    const resultText = monsterEncounter.querySelector('.combat-result-text');
+    const roundControls = monsterEncounter.querySelector('.combat-round-controls');
+
+        // Sauvegarder le combat dans l'historique s'il est terminé
+    if (winner) {
+        const combatState = activeCombats.get(monsterEncounter);
+        if (combatState) {
+            const completedCombat = {
+                monster_name: combatState.monster_name,
+                monster_skill: combatState.monster_skill,
+                monster_max_stamina: combatState.monster_max_stamina,
+                rounds_fought: combatState.round_number - 1,
+                winner: winner,
+                final_player_stamina: combatState.player_stamina,
+                final_monster_stamina: combatState.monster_stamina,
+                final_player_luck: combatState.player_luck,
+                completed_at: new Date().toISOString()
+            };
+            addToCombatHistory(completedCombat);
+        }
+    }
+
+    // Supprimer le combat actif
+    activeCombats.delete(monsterEncounter);
+
+    if (winner) {
+        // Afficher le résultat final
+        let message = '';
+        let bgClass = '';
+
+        if (winner === 'player') {
+            message = '🏆 Vous avez vaincu le monstre !';
+            bgClass = 'bg-green-50';
+            resultDiv.querySelector('h5').className = 'font-bold text-green-800 mb-2';
+        } else if (winner === 'monster') {
+            message = '💀 Vous avez été vaincu par le monstre...';
+            bgClass = 'bg-red-50';
+            resultDiv.querySelector('h5').className = 'font-bold text-red-800 mb-2';
+            resultDiv.querySelector('h5').textContent = '💀 Combat terminé !';
+        } else {
+            message = '⚖️ Combat terminé par égalité (les deux combattants sont épuisés)';
+            bgClass = 'bg-yellow-50';
+            resultDiv.querySelector('h5').className = 'font-bold text-yellow-800 mb-2';
+            resultDiv.querySelector('h5').textContent = '⚖️ Combat terminé !';
+        }
+
+        resultDiv.className = `combat-result ${bgClass} rounded-lg p-4 mt-4`;
+        resultText.textContent = message;
+        resultDiv.style.display = 'block';
+
+        // Masquer les contrôles de round
+        roundControls.style.display = 'none';
+    } else {
+        // Combat annulé manuellement
+        resultDiv.style.display = 'none';
+        combatInterface.style.display = 'none';
+    }
+
+    // Réafficher le bouton de début, masquer le bouton de fin
+    startBtn.style.display = 'inline-block';
+    endBtn.style.display = 'none';
+}
+
+function displayCombatHistory() {
+    const historyContainer = document.getElementById('combat-history-list');
+    const noHistoryMessage = document.getElementById('no-combat-history');
+
+    // Vider le conteneur
+    historyContainer.innerHTML = '';
+
+    if (combatHistory.length === 0) {
+        noHistoryMessage.style.display = 'block';
+        return;
+    }
+
+    noHistoryMessage.style.display = 'none';
+
+    // Afficher chaque combat terminé (du plus récent au plus ancien)
+    const reversedHistory = [...combatHistory].reverse();
+    reversedHistory.forEach((combat, index) => {
+        const combatDiv = document.createElement('div');
+        combatDiv.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+
+        const winnerClass = combat.winner === 'player' ? 'text-green-600' : 'text-red-600';
+        const winnerIcon = combat.winner === 'player' ? '🏆' : '💀';
+        const winnerText = combat.winner === 'player' ? 'Victoire du joueur' : 'Défaite du joueur';
+
+        const completedDate = new Date(combat.completed_at).toLocaleString('fr-FR', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        combatDiv.innerHTML = `
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="text-lg font-bold text-gray-800">👹 ${combat.monster_name}</h3>
+                <span class="text-sm text-gray-500">${completedDate}</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div class="bg-white rounded p-3">
+                    <h4 class="font-semibold text-gray-700 mb-2">Caractéristiques du monstre</h4>
+                    <div class="text-sm space-y-1">
+                        <div>Habileté: <span class="font-medium">${combat.monster_skill}</span></div>
+                        <div>Endurance initiale: <span class="font-medium">${combat.monster_max_stamina}</span></div>
+                        <div>Endurance finale: <span class="font-medium text-red-600">${combat.final_monster_stamina}</span></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded p-3">
+                    <h4 class="font-semibold text-gray-700 mb-2">État final du joueur</h4>
+                    <div class="text-sm space-y-1">
+                        <div>Endurance: <span class="font-medium text-red-600">${combat.final_player_stamina}</span></div>
+                        <div>Chance: <span class="font-medium text-green-600">${combat.final_player_luck}</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    ⚔️ ${combat.rounds_fought} round(s) de combat
+                </div>
+                <div class="font-bold ${winnerClass}">
+                    ${winnerIcon} ${winnerText}
+                </div>
+            </div>
+        `;
+
+        historyContainer.appendChild(combatDiv);
+    });
+}
+
+function addToCombatHistory(combat) {
+    combatHistory.push(combat);
+    displayCombatHistory();
 }
 </script>
 {% endblock %}
