@@ -1,26 +1,26 @@
-# Utiliser Python 3.12 slim comme image de base
 FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Définir le répertoire de travail
+ARG USER=app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 WORKDIR /app
 
-# Installer les dépendances système nécessaires
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+RUN addgroup --gid 65535 ${USER} && \
+    adduser --shell /sbin/nologin --disabled-password \
+    --no-create-home --uid 65535 --ingroup ${USER} ${USER} && \
+    apt-get update && apt-get install -y jq && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copier les fichiers de dépendances
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
+RUN uv sync --no-dev
 
-# Installer uv et les dépendances Python
-RUN pip install uv && \
-    uv sync --frozen
+COPY src/ src/
 
-# Copier le code source
-COPY src/ ./src/
+USER ${USER}:${USER}
 
-# Exposer le port 8000
-EXPOSE 8000
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Commande par défaut pour démarrer l'application
-CMD ["uv", "run", "python", "main.py"]
+ENTRYPOINT ["python3", "src/main.py"]
